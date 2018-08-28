@@ -11,6 +11,13 @@
 
 #include "utils.h"
 
+//Wei Zhou, 08/26/2018
+//rabbitmq utilis.c include file
+#include <amqp.h>
+#include <amqp_framing.h>
+#include <stdint.h>
+#include <ctype.h>
+#include <stdarg.h>
 
 /*
 // old timing. is it better? who knows!!

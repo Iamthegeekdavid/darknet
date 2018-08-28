@@ -420,6 +420,8 @@ int main(int argc, char **argv)
 #else
     if(gpu_index >= 0){
         cuda_set_device(gpu_index);
+        //https://github.com/AlexeyAB/darknet/issues/1232#issuecomment-410190993
+        check_error(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
     }
 #endif
 

@@ -207,6 +207,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     }
     avg = calloc(demo_total, sizeof(float));
 
+    filename = "rtsp://admin:12345@10.0.0.171";
+    
     if(filename){
         printf("video file: %s\n", filename);
         cap = cvCaptureFromFile(filename);

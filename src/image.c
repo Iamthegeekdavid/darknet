@@ -10,6 +10,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+//Wei Zhou, 08/26/2018
+#include <time.h>
+#include <stdlib.h>
+
 int windows = 0;
 
 float colors[6][3] = { {1,0,1}, {0,0,1},{0,1,1},{0,1,0},{1,1,0},{1,0,0} };
@@ -240,6 +244,9 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
 {
     int i,j;
 
+    //Wei Zhou 08/26/2018
+    char const *messagebody;
+
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
         int class = -1;
@@ -253,6 +260,15 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
                     strcat(labelstr, names[j]);
                 }
                 printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+
+                //Wei Zhou 08/26/2018
+                int precision = (int)(dets[i].prob[j] * 1000);
+                char* personstr = "person";
+                int compare = strcmp(labelstr, personstr);
+                if (precision > 50 && compare == 0)
+                {
+                    //sendmessage(labelstr, precision);        
+                }
             }
         }
         if(class >= 0){
