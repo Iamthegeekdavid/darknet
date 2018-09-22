@@ -737,6 +737,7 @@ data load_all_cifar10();
 box_label *read_boxes(char *filename, int *n);
 box float_to_box(float *f, int stride);
 void draw_detections(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes);
+void draw_detections_demo(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, time_t prev_time);
 
 matrix network_predict_data(network *net, data test);
 image **load_alphabet();
@@ -761,6 +762,7 @@ matrix make_matrix(int rows, int cols);
 #ifndef __cplusplus
 #ifdef OPENCV
 image get_image_from_stream(CvCapture *cap);
+image get_image_from_stream_roi(CvCapture *cap);
 #endif
 #endif
 void free_image(image m);
