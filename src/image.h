@@ -12,10 +12,13 @@
 #ifndef __cplusplus
 #ifdef OPENCV
 int fill_image_from_stream(CvCapture *cap, image im);
+int fill_image_from_stream_roi(CvCapture *cap, image im);
 image ipl_to_image(IplImage* src);
+void image_to_ipl(image im, IplImage* iplimg);
 void ipl_into_image(IplImage* src, image im);
 void flush_stream_buffer(CvCapture *cap, int n);
 void show_image_cv(image p, const char *name, IplImage *disp);
+void show_image_cv_rect(image p, const char *name, IplImage *disp);
 #endif
 #endif
 

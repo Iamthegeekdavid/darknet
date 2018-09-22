@@ -36,6 +36,12 @@ static int demo_done = 0;
 static int demo_total = 0;
 double demo_time;
 
+time_t tmpmem;
+time_t* prev_time = &tmpmem;
+//*prev_time = 0;
+//time(&prev_time);
+static IplImage* imageDetected;
+
 detection *get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num);
 
 int size_network(network *net)
@@ -125,12 +131,15 @@ void *detect_in_thread(void *ptr)
 
     if (nms > 0) do_nms_obj(dets, nboxes, l.classes, nms);
 
-    printf("\033[2J");
-    printf("\033[1;1H");
-    printf("\nFPS:%.1f\n",fps);
-    printf("Objects:\n\n");
+    // printf("\033[2J");
+    // printf("\033[1;1H");
+    // printf("\nFPS:%.1f\n",fps);
+    // printf("Objects:\n\n");
+
     image display = buff[(buff_index+2) % 3];
-    draw_detections(display, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes);
+    //update with prev_time
+    //draw_detections(display, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes);
+    draw_detections_demo(display, dets, nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, prev_time, imageDetected);
     free_detections(dets, nboxes);
 
     demo_index = (demo_index + 1)%demo_frame;
@@ -140,7 +149,8 @@ void *detect_in_thread(void *ptr)
 
 void *fetch_in_thread(void *ptr)
 {
-    int status = fill_image_from_stream(cap, buff[buff_index]);
+    //int status = fill_image_from_stream(cap, buff[buff_index]);
+    int status = fill_image_from_stream_roi(cap, buff[buff_index]);
     letterbox_image_into(buff[buff_index], net->w, net->h, buff_letter[buff_index]);
     if(status == 0) demo_done = 1;
     return 0;
@@ -149,6 +159,7 @@ void *fetch_in_thread(void *ptr)
 void *display_in_thread(void *ptr)
 {
     show_image_cv(buff[(buff_index + 1)%3], "Demo", ipl);
+    //show_image_cv_rect(buff[(buff_index + 1)%3], "Demo", ipl);
     int c = cvWaitKey(1);
     if (c != -1) c = c%256;
     if (c == 27) {
@@ -182,8 +193,26 @@ void *detect_loop(void *ptr)
     }
 }
 
+void testSetROI()
+{
+  int key = 0;
+  IplImage* roi_img = cvLoadImage("/home/bigeye/2_dnn/darknet/tree/yolov3/predictions.jpg", 3); 
+  /* sets the Region of Interest*/
+  cvSetImageROI(roi_img, cvRect(370, 280, 150, 150));
+  cvNamedWindow( "Example1", CV_WINDOW_NORMAL );
+  cvShowImage("Example1", roi_img);
+  cvWaitKey(0);
+  cvReleaseImage( &roi_img );
+  cvDestroyWindow( "Example1" );
+}
+
 void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int delay, char *prefix, int avg_frames, float hier, int w, int h, int frames, int fullscreen)
 {
+    //test of ROI
+    //testSetROI();
+    //prev_time
+    *prev_time = 0;
+
     //demo_frame = avg_frames;
     image **alphabet = load_alphabet();
     demo_names = names;
@@ -228,13 +257,18 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
     if(!cap) error("Couldn't connect to webcam.\n");
 
-    buff[0] = get_image_from_stream(cap);
+    //IplImage* imageDetected = cvQueryFrame(cap);
+    //imageDetected = cvQueryFrame(cap);
+
+    //buff[0] = get_image_from_stream(cap);
+    buff[0] = get_image_from_stream_roi(cap);
     buff[1] = copy_image(buff[0]);
     buff[2] = copy_image(buff[0]);
     buff_letter[0] = letterbox_image(buff[0], net->w, net->h);
     buff_letter[1] = letterbox_image(buff[0], net->w, net->h);
     buff_letter[2] = letterbox_image(buff[0], net->w, net->h);
     ipl = cvCreateImage(cvSize(buff[0].w,buff[0].h), IPL_DEPTH_8U, buff[0].c);
+    imageDetected = cvCreateImage(cvSize(buff[0].w, buff[0].h), IPL_DEPTH_8U, buff[0].c);
 
     int count = 0;
     if(!prefix){

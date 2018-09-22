@@ -244,9 +244,6 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
 {
     int i,j;
 
-    //Wei Zhou 08/26/2018
-    char const *messagebody;
-
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
         int class = -1;
@@ -261,13 +258,125 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
                 }
                 printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
 
+            }
+        }
+        if(class >= 0){
+            int width = im.h * .006;
+
+            /*
+               if(0){
+               width = pow(prob, 1./2.)*10+1;
+               alphabet = 0;
+               }
+             */
+
+            //printf("%d %s: %.0f%%\n", i, names[class], prob*100);
+            int offset = class*123457 % classes;
+            float red = get_color(2,offset,classes);
+            float green = get_color(1,offset,classes);
+            float blue = get_color(0,offset,classes);
+            float rgb[3];
+
+            //width = prob*20+2;
+
+            rgb[0] = red;
+            rgb[1] = green;
+            rgb[2] = blue;
+            box b = dets[i].bbox;
+            //printf("%f %f %f %f\n", b.x, b.y, b.w, b.h);
+
+            int left  = (b.x-b.w/2.)*im.w;
+            int right = (b.x+b.w/2.)*im.w;
+            int top   = (b.y-b.h/2.)*im.h;
+            int bot   = (b.y+b.h/2.)*im.h;
+
+            if(left < 0) left = 0;
+            if(right > im.w-1) right = im.w-1;
+            if(top < 0) top = 0;
+            if(bot > im.h-1) bot = im.h-1;
+
+            draw_box_width(im, left, top, right, bot, width, red, green, blue);
+            if (alphabet) {
+                image label = get_label(alphabet, labelstr, (im.h*.03));
+                draw_label(im, top + width, left, label, rgb);
+                free_image(label);
+            }
+            if (dets[i].mask){
+                image mask = float_to_image(14, 14, 1, dets[i].mask);
+                image resized_mask = resize_image(mask, b.w*im.w, b.h*im.h);
+                image tmask = threshold_image(resized_mask, .5);
+                embed_image(tmask, im, left, top);
+                free_image(mask);
+                free_image(resized_mask);
+                free_image(tmask);
+            }
+        }
+    }
+}
+
+void draw_detections_demo(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, time_t* prev_time, IplImage* imgout)
+{
+    int i,j;
+
+    //Wei Zhou 08/26/2018
+    char const *messagebody;
+    time_t cur_time;
+
+    char* filepath = "/home/bigeye/2_dnn/darknet/tree/yolov3/detected_person/";
+    int p[3];
+    p[0] = CV_IMWRITE_JPEG_QUALITY;
+    p[1] = 90;
+    p[2] = 0;
+
+    for(i = 0; i < num; ++i){
+        char labelstr[4096] = {0};
+        int class = -1;
+        for(j = 0; j < classes; ++j){
+            if (dets[i].prob[j] > thresh){
+                if (class < 0) {
+                    strcat(labelstr, names[j]);
+                    class = j;
+                } else {
+                    strcat(labelstr, ", ");
+                    strcat(labelstr, names[j]);
+                }
+                //printf("%s: %.0f%%\n", names[j], dets[i].prob[j]*100);
+
                 //Wei Zhou 08/26/2018
-                int precision = (int)(dets[i].prob[j] * 1000);
+                //precision * 100
+                int precision = (int)(dets[i].prob[j] * 100);
                 char* personstr = "person";
                 int compare = strcmp(labelstr, personstr);
+                //Wei Zhou 09/08/2018
+                //send message once a second with precision > 50
+                time(&cur_time);
+                int time_lapse = cur_time - (*prev_time);
                 if (precision > 50 && compare == 0)
                 {
-                    //sendmessage(labelstr, precision);        
+                    if((*prev_time > 0 && time_lapse >= 10) || *prev_time == 0)
+                    {
+                        printf("current time = %d\n", (int)cur_time);
+                        printf("previous time = %d\n", (int) *prev_time);
+                        *prev_time = cur_time;
+                        //save image
+                        //imgout.data = im.data;
+
+                        image_to_ipl(im, imgout);
+                        //show_image_cv(buff[(buff_index + 1)%3], "Demo", ipl);
+
+                        char tmptime[10];
+                        int tmpint = (int)cur_time;
+                        sprintf(tmptime, "%d", tmpint);
+
+                        char* imgoutfile = malloc(strlen(filepath) + strlen(tmptime));
+                        strcpy(imgoutfile, filepath);
+                        strcat(imgoutfile, tmptime);
+                        strcat(imgoutfile,".jpg");
+
+                        cvSaveImage(imgoutfile, imgout, p);
+                        //imwrite(imgoutfile, imgout);
+                        sendmessage_v2(imgoutfile, labelstr, precision); 
+                    } 
                 }
             }
         }
@@ -324,6 +433,7 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
         }
     }
 }
+
 
 void transpose_image(image im)
 {
@@ -586,6 +696,46 @@ void show_image_cv(image p, const char *name, IplImage *disp)
     }
     cvShowImage(buff, disp);
 }
+
+void show_image_cv_rect(image p, const char *name, IplImage *disp)
+{
+    int x,y,k;
+    if(p.c == 3) rgbgr_image(p);
+    //normalize_image(copy);
+
+    char buff[256];
+    //sprintf(buff, "%s (%d)", name, windows);
+    sprintf(buff, "%s", name);
+
+    int step = disp->widthStep;
+    cvNamedWindow(buff, CV_WINDOW_NORMAL); 
+    //cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
+    ++windows;
+    for(y = 0; y < p.h; ++y){
+        for(x = 0; x < p.w; ++x){
+            for(k= 0; k < p.c; ++k){
+                disp->imageData[y*step + x*p.c + k] = (unsigned char)(get_pixel(p,x,y,k)*255);
+            }
+        }
+    }
+    if(0){
+        int w = 448;
+        int h = w*p.h/p.w;
+        if(h > 1000){
+            h = 1000;
+            w = h*p.w/p.h;
+        }
+        IplImage *buffer = disp;
+        disp = cvCreateImage(cvSize(w, h), buffer->depth, buffer->nChannels);
+        cvResize(buffer, disp, CV_INTER_LINEAR);
+        cvReleaseImage(&buffer);
+    }
+    //draw rect
+    //CvPoint pt1 = CvPoint(320, 540);
+    //CvPOint pt2 = CvPoint(960, 180);
+    cvRectangle(disp, cvPoint(320, 540), cvPoint(960, 180), CV_RGB(0, 0, 0), 1, 8, 0);
+    cvShowImage(buff, disp);
+}
 #endif
 
 int show_image(image p, const char *name, int ms)
@@ -622,6 +772,25 @@ void ipl_into_image(IplImage* src, image im)
         for(k= 0; k < c; ++k){
             for(j = 0; j < w; ++j){
                 im.data[k*w*h + i*w + j] = data[i*step + j*c + k]/255.;
+            }
+        }
+    }
+}
+
+//generate IplImage image from "image" format
+void image_to_ipl(image im, IplImage* iplimg)
+{
+    int x, y, k;
+    if(im.c == 3)
+    {
+        rgbgr_image(im);
+    }
+
+    int step = iplimg->widthStep;
+    for(y = 0; y < im.h; ++y){
+        for(x = 0; x < im.w; ++x){
+            for(k= 0; k < im.c; ++k){
+                iplimg->imageData[y * step + x * im.c + k] = (unsigned char)(get_pixel(im,x,y,k)*255);
             }
         }
     }
@@ -684,6 +853,27 @@ int fill_image_from_stream(CvCapture *cap, image im)
 {
     IplImage* src = cvQueryFrame(cap);
     if (!src) return 0;
+    ipl_into_image(src, im);
+    rgbgr_image(im);
+    return 1;
+}
+
+//test of Region Of Interest
+image get_image_from_stream_roi(CvCapture *cap)
+{
+    IplImage* src = cvQueryFrame(cap);
+    if (!src) return make_empty_image(0,0,0);
+    cvSetImageROI(src, cvRect(640, 360, 640, 360));
+    image im = ipl_to_image(src);
+    rgbgr_image(im);
+    return im;
+}
+
+int fill_image_from_stream_roi(CvCapture *cap, image im)
+{
+    IplImage* src = cvQueryFrame(cap);
+    if (!src) return 0;
+    cvSetImageROI(src, cvRect(640, 360, 640, 360));
     ipl_into_image(src, im);
     rgbgr_image(im);
     return 1;
